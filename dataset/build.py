@@ -99,6 +99,10 @@ def _generate_normalized_split(
                     n_added += 1
                 n_iter += 1
             assert labels.sum() == m_size/2
+            assert n_iter < cutoff, (
+                "Cutoff reached, please adjust start and end so "
+                "that the probability of planarity is less extreme."
+            )
             np.savez(path,data=data,labels=labels)
 
 
