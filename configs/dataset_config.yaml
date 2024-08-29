@@ -1,0 +1,8 @@
+n: 10
+start: 15
+end: 21
+train_size: 94_992   
+val_size: 4_992
+normalized_train: True
+normalized_val: True
+cutoff: 500_000
