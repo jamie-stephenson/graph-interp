@@ -9,8 +9,10 @@ from torch import nn
 from torch.nn import functional as F
 from torch import Tensor
 from jaxtyping import Float, Int
+from wandb.sdk.wandb_config import Config
 
 from dataclasses import dataclass
+from inspect import signature
 import logging
 from typing import Optional, Tuple, Dict, Literal, Union
 
@@ -171,9 +173,25 @@ class AdjTransformer(HookedTransformer):
     ):
         return F.cross_entropy(logits, label)
     
-def get_model(model_config):
-    
-    cfg = AdjTransformerConfig(**model_config)
+def get_model(args: Config):
+
+    # I can't get my wandb sweep to support nested config dict
+    # so all model params have to be a top level param which
+    # we filter as follows:
+
+    # Dataclasses don't seem to inherit full signature? So we combine both signatures:
+    cfg_signature = {
+        **signature(AdjTransformerConfig).parameters,
+        **signature(HookedTransformerConfig).parameters
+    }
+
+    cfg = AdjTransformerConfig(
+        **{
+            key: value
+            for key, value in args.items()
+            if key in cfg_signature
+        }
+    )
 
     return AdjTransformer(cfg)
 

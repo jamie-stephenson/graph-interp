@@ -15,18 +15,17 @@ def train(model,train_dataloader,eval_dataloader,optimizer,lr_scheduler,args):
 
         val_loss, val_acc = evaluate(model,eval_dataloader,args)
 
-        if args.no_wandb:
-            print("-"*40)
-            print(f"Epoch {epoch}")
-            print("-"*40)
-            print(f"Current validation loss is: {val_loss:.2f}")
-            print(f"Current validation accuracy is: {val_acc:.2f}")
-        else:
-            wandb.log({
-                "Epoch": epoch,
-                "Val Loss": val_loss,
-                "Val Accuracy": val_acc
-            })
+        print("-"*40)
+        print(f"Epoch {epoch}")
+        print("-"*40)
+        print(f"Current validation loss is: {val_loss:.2f}")
+        print(f"Current validation accuracy is: {val_acc:.2f}")
+
+        wandb.log({
+            "epoch": epoch,
+            "val_Loss": val_loss,
+            "val_acc": val_acc
+        })
                             
         for x, y in train_dataloader:
 
@@ -51,16 +50,14 @@ def train(model,train_dataloader,eval_dataloader,optimizer,lr_scheduler,args):
 
                 graphs_per_second = args.batch_size*args.batch_per_log/dt
                                     
-                if args.no_wandb:
-                    print(f"batch {batch:.0f} | loss: {loss.item():.2f} | dt: {dt*1000:.2f}ms | graphs/s: {graphs_per_second:.2f}")
-                else:
-                    wandb.log({
-                        "Train Loss": loss.item(),
-                        "Learning Rate": lr_scheduler.get_last_lr(),
-                        "Time": t1 - t0,
-                        "Batch Number": batch,
-                        "Graphs per Second": graphs_per_second
-                    })
+                print(f"batch {batch:.0f} | loss: {loss.item():.2f} | dt: {dt*1000:.2f}ms | graphs/s: {graphs_per_second:.2f}")
+                wandb.log({
+                    "loss": loss.item(),
+                    "lr": lr_scheduler.get_last_lr()[0],
+                    "time": t1 - t0,
+                    "batch": batch,
+                    "Graphs per Second": graphs_per_second
+                })
                     
             # ----------------------------------------------           
 

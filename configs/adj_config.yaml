@@ -1,29 +1,52 @@
-name: aisf
+name:
+ value: aisf
 
 # Training Args:
-train_path: data/n10_15-21_tn_vn/train.npz
-val_path: data/n10_15-21_tn_vn/val.npz
-epochs: 100
-beta1: 0.9
-beta2: 0.98
-weight_decay: 0.1
-lr_pct_start: 0.1
-lr_max: 0.001
-batch_size: 128
-batch_per_log: 15
-seed: 90
+train_path:
+ value: data/n10_15-21_tn_vn/train.npz
+val_path:
+ value: data/n10_15-21_tn_vn/val.npz
+epochs:
+ value: 1
+beta1:
+ value: 0.9
+beta2:
+ value: 0.98
+weight_decay:
+ value: 0.1
+lr_pct_start:
+ value: 0.1
+lr_max:
+ value: 0.001
+batch_size:
+ value: 128
+batch_per_log:
+ value: 15
+seed:
+ value: 90
 
 # Model Args:
-model_name: adj
-model_config:
-  d_vocab_out: 2
-  d_model: 128
-  d_head: 32
-  n_heads: 4 
-  n_vertices: 10
-  pool_type: mean
-  n_layers: 2
-  attn_only: False
-  act_fn: gelu
-  use_attn_result: True
-  positional_embedding_type: shortformer
+format:
+ value: adj
+d_vocab_out:
+ value: 2
+d_model:
+ value: 128
+d_head:
+ value: 32
+n_heads:
+ value: 4 
+n_vertices:
+ value: 10
+pool_type:
+ value: mean
+n_layers:
+ value: 2
+attn_only:
+ value: False
+act_fn:
+ value: gelu
+use_attn_result:
+ value: True
+positional_embedding_type:
+ value: shortformer

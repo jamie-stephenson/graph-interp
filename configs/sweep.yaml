@@ -1,0 +1,54 @@
+method: grid
+name: sweep
+metric:
+  goal: maximize
+  name: val_acc
+parameters:
+  train_path:
+    value: data/n10_15-21_tn_vn/train.npz
+  val_path:
+    value: data/n10_15-21_tn_vn/val.npz
+  epochs:
+    value: 10
+  beta1:
+    value: 0.9
+  beta2:
+    value: 0.98
+  weight_decay:
+    value: 0.1
+  lr_pct_start:
+    value: 0.1
+  lr_max:
+    values: [0.0005,0.001,0.005,0.01]
+  batch_size:
+    value: 128
+  batch_per_log:
+    value: 15
+  seed:
+    value: 90
+
+  # Model Args:
+  format:
+    value: adj
+  d_vocab_out:
+    value: 2
+  d_model:
+    value: 128
+  d_head:
+    value: 32
+  n_heads: 
+    values: [4, 8] 
+  n_vertices:
+    value: 10
+  pool_type:
+    value: mean
+  n_layers:
+    value: 2
+  attn_only:
+    value: False
+  act_fn:
+    value: gelu
+  use_attn_result:
+    value: True
+  positional_embedding_type:
+    value: shortformer

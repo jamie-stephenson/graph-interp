@@ -1,7 +1,7 @@
 .ipynb_checkpoints
 __pycache__
 data
-test.ipynb
+test*
 wandb
 .vscode
 trained_models
