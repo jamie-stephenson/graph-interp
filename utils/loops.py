@@ -23,7 +23,7 @@ def train(model,train_dataloader,eval_dataloader,optimizer,lr_scheduler,args):
 
         wandb.log({
             "epoch": epoch,
-            "val_Loss": val_loss,
+            "val_loss": val_loss,
             "val_acc": val_acc
         })
                             
