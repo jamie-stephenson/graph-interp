@@ -45,13 +45,12 @@ def generate_dataset(
 
     for split,size,normalized in split_args:
 
-        m_size = size//(end-start) # Number of graphs needed for each m value
         split_path = path/Path(f"{split}.npz")
 
         if normalized:
-            _generate_normalized_split(n,split,start,end,split_path,m_size,cutoff)
+            _generate_normalized_split(n,split,start,end,split_path,size,cutoff)
         else:
-            _generate_natural_split(n,split,start,end,split_path,m_size)
+            _generate_natural_split(n,split,start,end,split_path,size)
 
 
 def _generate_normalized_split(
@@ -60,7 +59,7 @@ def _generate_normalized_split(
         start: int,
         end: int,
         path: Path,
-        m_size: int,   
+        size: int,   
         cutoff: int
     ):
         """
@@ -76,15 +75,16 @@ def _generate_normalized_split(
         in very long (or infinite) loops.
         """
 
-        data = np.empty((m_size,n,n))
-        labels = np.empty((m_size))
+        data = np.empty((size,n,n))
+        labels = np.zeros((size))
+        m_size = size//(end-start) # Number of graphs needed for each m value
 
-        for m in tqdm(range(start,end),desc=f"generating {split} split..."):
+        n_added = 0
+        for i,m in tqdm(enumerate(range(start,end)),desc=f"generating {split} split..."):
             n_planar = 0
             n_non_planar = 0
-            n_added = 0
             n_iter = 0
-            while n_added < m_size and n_iter < cutoff:
+            while n_added < (i+1)*m_size and n_iter < cutoff:
                 g = nx.gnm_random_graph(n, m)
                 is_planar = nx.is_planar(g)
                 if is_planar and n_planar < m_size/2:
@@ -98,7 +98,7 @@ def _generate_normalized_split(
                     n_non_planar += 1
                     n_added += 1
                 n_iter += 1
-            assert labels.sum() == m_size/2
+            assert labels.sum() == n_added/2
             assert n_iter < cutoff, (
                 "Cutoff reached, please adjust start and end so "
                 "that the probability of planarity is less extreme."
@@ -112,7 +112,7 @@ def _generate_natural_split(
         start: int,
         end: int,
         path: Path,
-        m_size: int
+        size: int
     ):
         """
         Generate a single split of random graphs. 
@@ -125,8 +125,9 @@ def _generate_natural_split(
         present is representetive of G(n,m).
         """
         
-        data = np.empty((m_size,n,n))
-        labels = np.empty((m_size))
+        data = np.empty((size,n,n))
+        labels = np.empty((size))
+        m_size = size//(end-start) # Number of graphs needed for each m value
 
         for i,m in tqdm(enumerate(range(start,end)),desc=f"generating {split} split..."):
             for j in range(m_size):
