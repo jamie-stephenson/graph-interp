@@ -47,6 +47,6 @@ attn_only:
 act_fn:
  value: gelu
 use_attn_result:
- value: True
+ value: False
 positional_embedding_type:
  value: shortformer
