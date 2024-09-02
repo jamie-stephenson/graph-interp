@@ -81,7 +81,7 @@ def parse_clargs():
 
     parser.add_argument(
         "--config",
-        default="configs/adj_config.yaml",
+        default="configs/model_config.yaml",
         type=str,
         help="Path to config file."
     )

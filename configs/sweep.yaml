@@ -9,17 +9,17 @@ parameters:
   val_path:
     value: data/n10_15-21_tn_vn/val.npz
   epochs:
-    value: 10
+    value: 100
   beta1:
     value: 0.9
   beta2:
     value: 0.98
   weight_decay:
-    value: 0.1
+    value: [0.001,0.01,0.1]
   lr_pct_start:
     value: 0.1
   lr_max:
-    values: [0.0005,0.001,0.005,0.01]
+    values: [0.001,0.01]
   batch_size:
     value: 128
   batch_per_log:
@@ -31,7 +31,7 @@ parameters:
 
   # Model Args:
   model:
-    value: transformer
+    value: mlp
   d_vocab_out:
     value: 2
   d_model:
@@ -39,17 +39,15 @@ parameters:
   d_head:
     value: 32
   n_heads: 
-    values: [4, 8] 
+    value: 8 
   n_vertices:
     value: 10
   pool_type:
     value: mean
   n_layers:
-    value: 2
+    values: [1,2,3]
   attn_only:
     value: False
-  act_fn:
-    value: gelu
   use_attn_result:
     value: False
   positional_embedding_type:

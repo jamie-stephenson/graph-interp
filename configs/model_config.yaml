@@ -1,13 +1,10 @@
-name:
- value: aisf
-
 # Training Args:
 train_path:
  value: data/n10_15-21_tn_vn/train.npz
 val_path:
  value: data/n10_15-21_tn_vn/val.npz
 epochs:
- value: 1
+ value: 1000
 beta1:
  value: 0.9
 beta2:
@@ -29,11 +26,11 @@ format:
 
 # Model Args:
 model:
- value: transformer 
+ value: mlp 
 d_vocab_out:
  value: 2
 d_model:
- value: 128
+ value: 64
 d_head:
  value: 32
 n_heads:
@@ -46,8 +43,6 @@ n_layers:
  value: 2
 attn_only:
  value: False
-act_fn:
- value: gelu
 use_attn_result:
  value: False
 positional_embedding_type:

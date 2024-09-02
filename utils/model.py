@@ -15,13 +15,19 @@ def deactivate_position(model):
 @dataclass(kw_only=True)
 class ModelConfig(HookedTransformerConfig):
     """
-    Hacky wrapper to add clearer contextual names (`n_vertices`)
-    and more suitable defaults ("bidirectional")
+    Hacky wrapper to add: 
+    - clearer contextual names (e.g.`n_vertices`)
+    - more suitable defaults (e.g. "bidirectional")
+    - use as a config for more generic models (e.g. MLP)
     """
     # clearer names
     n_vertices: int
 
     n_ctx: int = None
+
+    # mlps do not require `d_head` and `act_fn` but __post_init__ does
+    d_head: int = 1 
+    act_fn: str = 'gelu'
 
     def __post_init__(self):
         self.n_ctx = self.n_vertices
@@ -48,6 +54,7 @@ class MeanPool(nn.Module):
 class HookedLinear(nn.Module):
 
     def __init__(self,size_in,size_out,dtype):
+        super().__init__()
         self.W = nn.Parameter(torch.empty(size_in, size_out, dtype=dtype))
         self.b = nn.Parameter(torch.zeros(size_out, dtype=dtype))
         self.hook_pre = HookPoint()

@@ -61,10 +61,10 @@ class Transformer(HookedTransformer):
 
     def forward(
         self,
-        input: Float[Tensor, "batch n_ctx n_vertices"],
+        input: Float[Tensor, "batch n_vertices n_vertices"],
         label: Optional[Tensor] = None, # `bool` is usecase specific may need to change
         return_type: Optional[str] = "logits",
-        shortformer_pos_embed: Optional[Float[Tensor, "batch n_ctx d_model"]] = None,
+        shortformer_pos_embed: Optional[Float[Tensor, "batch n_vertices d_model"]] = None,
         start_at_layer: Optional[int] = None,
         stop_at_layer: Optional[int] = None,
     ) -> Union[
