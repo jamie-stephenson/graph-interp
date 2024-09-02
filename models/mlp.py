@@ -16,7 +16,7 @@ class MLP(HookedRootModule):
         super().__init__()#TODO initialise layer weights correctly
         self.cfg = cfg
 
-        self.layer_in = HookedLinear(cfg.n_vertices**2,cfg.d_model,torch.float32)
+        layer_in = HookedLinear(cfg.n_vertices**2,cfg.d_model,torch.float32)
 
         hidden_layers = []
         for _ in range(cfg.n_layers): # here we use n_layers to represent number of hidden layers
@@ -24,9 +24,10 @@ class MLP(HookedRootModule):
             hidden_layers.append(HookedLinear(cfg.d_model,cfg.d_model,torch.float32))
 
         hidden_layers.append(nn.GELU())
-        self.hidden_layers = nn.Sequential(*hidden_layers)
 
-        self.layer_out = HookedLinear(cfg.d_model,cfg.d_vocab_out,torch.float32)
+        layer_out = HookedLinear(cfg.d_model,cfg.d_vocab_out,torch.float32)
+        
+        self.layers = nn.Sequential(layer_in,*hidden_layers,layer_out).to(cfg.device)
 
         if self.cfg.init_weights:
             self._init_weights_kaiming()
@@ -45,15 +46,11 @@ class MLP(HookedRootModule):
         Tuple[Float[Tensor, "batch d_vocab_out"], Float[Tensor, ""] ], # both
     ]:
         x = einops.rearrange(input,"a b c -> a (b c)") # flatten
-        x = self.layer_in(x)
-        x = self.hidden_layers(x)
-        x = self.layer_out(x)
+        logits = self.layers(x)
 
         if return_type is None:
             return None
         else:
-            logits = x
-
             if return_type == "logits":
                 return logits
             else:
