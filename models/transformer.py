@@ -80,12 +80,6 @@ class Transformer(HookedTransformer):
 
         if start_at_layer is None:
 
-            if self.cfg.pool_type == "token":
-                # Add special class token to begining, our logits will be calculated from this position.
-                batch_size, _, n_vertices = input.shape
-                planar_token = torch.zeros((batch_size,1,n_vertices),device=self.cfg.device)
-                input = torch.cat([planar_token,input], dim=1)
-
             embed = self.hook_embed(self.embed(input))
             pos_embed = self.hook_pos_embed(self.pos_embed(torch.arange(self.cfg.n_ctx,device=self.cfg.device)))
             residual = embed + pos_embed
