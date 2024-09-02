@@ -1,6 +1,6 @@
-from utils import TokenPool, MeanPool
+from utils.model import MeanPool, ModelConfig
 
-from transformer_lens import HookedTransformer, HookedTransformerConfig
+from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint 
 from transformer_lens.components import TransformerBlock, Unembed
 from transformer_lens.utilities import devices
@@ -9,45 +9,17 @@ from torch import nn
 from torch.nn import functional as F
 from torch import Tensor
 from jaxtyping import Float, Int
-from wandb.sdk.wandb_config import Config
 
-from dataclasses import dataclass
-from inspect import signature
 import logging
-from typing import Optional, Tuple, Dict, Literal, Union
+from typing import Optional, Tuple, Dict, Union
 
-@dataclass(kw_only=True)
-class AdjTransformerConfig(HookedTransformerConfig):
-    """
-    Hacky wrapper to add clearer contextual names (`n_vertices`),
-    handling for different pooling, and more suitable defaults ("bidirectional")
-    """
-    # pooling
-    pool_type: Literal["mean","stack","token"]
-
-    # clearer names
-    n_vertices: int
-
-    n_ctx: int = None
-
-    def __post_init__(self):
-        if self.pool_type == "token":
-            self.n_ctx = self.n_vertices + 1
-        else:
-            self.n_ctx = self.n_vertices
-
-        # More appropriate defaults
-        self.attention_dir = "bidirectional"
-        self.normalization_type = None
-        super().__post_init__()
-
-class AdjTransformer(HookedTransformer):
+class Transformer(HookedTransformer):
     """
     Transformer designed to take a graph's adjacency matrix as input.
     """
     def __init__(
         self,
-        cfg: Union[AdjTransformerConfig, Dict],
+        cfg: Union[ModelConfig, Dict],
         move_to_device: bool = True,
     ):
         """Model initialization.
@@ -61,7 +33,7 @@ class AdjTransformer(HookedTransformer):
         # Init from HookedRootModule
         super(HookedTransformer, self).__init__()
 
-        self.cfg = AdjTransformerConfig.unwrap(cfg)
+        self.cfg = ModelConfig.unwrap(cfg)
 
         self.embed = nn.Linear(self.cfg.n_vertices,self.cfg.d_model)
         self.hook_embed = HookPoint()  
@@ -73,13 +45,7 @@ class AdjTransformer(HookedTransformer):
             [TransformerBlock(self.cfg, block_index) for block_index in range(self.cfg.n_layers)]
         )
 
-        if self.cfg.pool_type == "token":
-            self.pool = TokenPool()
-        elif self.cfg.pool_type == "mean":
-            self.pool =  MeanPool()
-        else:
-            raise ValueError(f"Invalid pool type: {self.pool_type}")
-        self.hook_pool = HookPoint()
+        self.pool =  MeanPool()
         
         self.unembed = Unembed(self.cfg) 
 
@@ -172,28 +138,6 @@ class AdjTransformer(HookedTransformer):
         label: Int[Tensor, "batch"],
     ):
         return F.cross_entropy(logits, label)
-    
-def get_model(args: Config):
-
-    # I can't get my wandb sweep to support nested config dict
-    # so all model params have to be a top level param which
-    # we filter as follows:
-
-    # Dataclasses don't seem to inherit full signature? So we combine both signatures:
-    cfg_signature = {
-        **signature(AdjTransformerConfig).parameters,
-        **signature(HookedTransformerConfig).parameters
-    }
-
-    cfg = AdjTransformerConfig(
-        **{
-            key: value
-            for key, value in args.items()
-            if key in cfg_signature
-        }
-    )
-
-    return AdjTransformer(cfg)
 
 
 

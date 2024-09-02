@@ -183,9 +183,9 @@ if __name__ == '__main__':
     args = SimpleNamespace(**yaml_config)
 
     # Make informative directory name for dataset: 
-    normalized_train_string = "tn" if args.normalized_train else ""
-    normalized_val_string ="vn" if args.normalized_val else ""
-    path = Path(f"data/n{args.n}_{args.start}-{args.end}_{normalized_train_string}_{normalized_val_string}")
+    normalized_train_string = "_tn" if args.normalized_train else ""
+    normalized_val_string ="_vn" if args.normalized_val else ""
+    path = Path(f"data/n{args.n}_{args.start}-{args.end}{normalized_train_string}{normalized_val_string}")
 
     path.mkdir(parents=True)
 

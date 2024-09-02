@@ -24,12 +24,12 @@ def main(
 
         args = wandb.config
 
-        run.name = f"{args.format}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        run.name = f"{args.model}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
         torch.manual_seed(args.seed)
 
-        model = get_model(args.format,args)
+        model = get_model(args)
         train_dataloader = get_dataloader(args.format,args.train_path,args.batch_size)
         eval_dataloader = get_dataloader(args.format,args.val_path,args.batch_size)
 

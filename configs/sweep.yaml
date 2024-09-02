@@ -26,10 +26,12 @@ parameters:
     value: 15
   seed:
     value: 90
-
-  # Model Args:
   format:
     value: adj
+
+  # Model Args:
+  model:
+    value: transformer
   d_vocab_out:
     value: 2
   d_model:
