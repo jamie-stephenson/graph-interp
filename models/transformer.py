@@ -8,6 +8,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch import Tensor
+import einops
 from jaxtyping import Float, Int
 
 import logging
@@ -38,7 +39,7 @@ class Transformer(HookedTransformer):
         self.embed = nn.Linear(self.cfg.n_vertices,self.cfg.d_model)
         self.hook_embed = HookPoint()  
 
-        self.pos_embed = nn.Embedding(self.cfg.n_ctx,self.cfg.d_model)
+        self.pos_embed = nn.Embedding(self.cfg.n_vertices,self.cfg.d_model)
         self.hook_pos_embed = HookPoint() 
 
         self.blocks = nn.ModuleList(
@@ -81,7 +82,12 @@ class Transformer(HookedTransformer):
         if start_at_layer is None:
 
             embed = self.hook_embed(self.embed(input))
-            pos_embed = self.hook_pos_embed(self.pos_embed(torch.arange(self.cfg.n_ctx,device=self.cfg.device)))
+            pos_embed = einops.repeat(
+                self.pos_embed(torch.arange(self.cfg.n_vertices,device=self.cfg.device)),
+                "n_vertices d_model -> batch n_vertices d_model",
+                batch = input.shape[0]
+            )
+            pos_embed = self.hook_pos_embed(pos_embed)
             residual = embed + pos_embed
 
         else:
