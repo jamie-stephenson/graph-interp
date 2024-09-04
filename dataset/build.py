@@ -169,7 +169,7 @@ if __name__ == '__main__':
     # args I want from the command line:
     parser.add_argument(
         "--config",
-        default="configs/dataset_config.yaml",
+        default="configs/dataset.yaml",
         type=Path,
         help="Path to config file."
     )
