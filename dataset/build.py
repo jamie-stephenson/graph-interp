@@ -43,6 +43,8 @@ def generate_dataset(
             f"divide {split}_size ({size}), maybe try {2*(end-start)*(size//(2*(end-start)))}."
         )
 
+    path.mkdir(parents=True)
+
     for split,size,normalized in split_args:
 
         split_path = path/Path(f"{split}.npz")
@@ -80,7 +82,7 @@ def _generate_normalized_split(
         m_size = size//(end-start) # Number of graphs needed for each m value
 
         n_added = 0
-        for i,m in tqdm(enumerate(range(start,end)),desc=f"generating {split} split..."):
+        for i,m in enumerate(tqdm(range(start,end),desc=f"generating {split} split")):
             n_planar = 0
             n_non_planar = 0
             n_iter = 0
@@ -129,7 +131,7 @@ def _generate_natural_split(
         labels = np.empty((size))
         m_size = size//(end-start) # Number of graphs needed for each m value
 
-        for i,m in tqdm(enumerate(range(start,end)),desc=f"generating {split} split..."):
+        for i,m in enumerate(tqdm(range(start,end),desc=f"generating {split} split")):
             for j in range(m_size):
                 g = nx.gnm_random_graph(n, m)
                 data[i*m_size+j] = nx.to_numpy_array(g)
@@ -144,7 +146,7 @@ def get_stats(n,start,end,m_sample_size,plot: bool = False):
     are planar.
     """
     stats = np.zeros((end-start))
-    for i,m in tqdm(enumerate(range(start,end))):
+    for i,m in enumerate(tqdm(range(start,end))):
         for _ in range(m_sample_size):
             g = nx.gnm_random_graph(n, m)
             is_planar = nx.is_planar(g)
@@ -186,8 +188,6 @@ if __name__ == '__main__':
     normalized_train_string = "_tn" if args.normalized_train else ""
     normalized_val_string ="_vn" if args.normalized_val else ""
     path = Path(f"data/n{args.n}_{args.start}-{args.end}{normalized_train_string}{normalized_val_string}")
-
-    path.mkdir(parents=True)
 
     generate_dataset(
         n=args.n,
