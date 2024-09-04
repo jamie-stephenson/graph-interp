@@ -1,11 +1,13 @@
 from transformer_lens import HookedTransformerConfig
 from transformer_lens.hook_points import HookPoint
 from transformer_lens.utilities.addmm import batch_addmm
+from transformer_lens.components import Embed
 import torch
 from torch import nn, Tensor
 from jaxtyping import Float
 
 from dataclasses import dataclass
+from typing import Union, Dict
 
 # for laplacian??
 def deactivate_position(model):
@@ -64,3 +66,20 @@ class HookedLinear(nn.Module):
     ) -> Float[Tensor, "batch pos d_model"]:
 
         return batch_addmm(self.b, self.W, self.hook_pre(x))
+    
+class GraphEmbed(nn.Module):
+    """
+    Embed the adjacency matrix by "looking up" the embeddings for the adjacent vertices
+    and summing those embeddings (i.e. multiply adjacency matrix by W_E) 
+    """
+    def __init__(self, cfg: Union[Dict, ModelConfig]):
+        super().__init__()
+        self.cfg = ModelConfig.unwrap(cfg)
+        self.W_E: Float[torch.Tensor, "n_vertices d_model"] = nn.Parameter(
+            torch.empty(self.cfg.n_vertices, self.cfg.d_model, dtype=self.cfg.dtype)
+        )
+
+    def forward(
+        self, input: Float[Tensor, "batch n_vertices n_vertices"]
+    ) -> Float[torch.Tensor, "batch n_vertices d_model"]:
+        return input @ self.W_E # (B V V)(V C)->(B V C)

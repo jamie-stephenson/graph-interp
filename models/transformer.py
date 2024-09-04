@@ -1,8 +1,8 @@
-from utils.model import MeanPool, ModelConfig
+from utils.model import MeanPool, GraphEmbed, ModelConfig
 
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint 
-from transformer_lens.components import TransformerBlock, Unembed
+from transformer_lens.components import TransformerBlock, Unembed, PosEmbed
 from transformer_lens.utilities import devices
 import torch
 from torch import nn
@@ -36,10 +36,10 @@ class Transformer(HookedTransformer):
 
         self.cfg = ModelConfig.unwrap(cfg)
 
-        self.embed = nn.Linear(self.cfg.n_vertices,self.cfg.d_model)
+        self.embed = GraphEmbed(self.cfg)
         self.hook_embed = HookPoint()  
 
-        self.pos_embed = nn.Embedding(self.cfg.n_vertices,self.cfg.d_model)
+        self.pos_embed = PosEmbed(self.cfg)
         self.hook_pos_embed = HookPoint() 
 
         self.blocks = nn.ModuleList(
