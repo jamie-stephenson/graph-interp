@@ -1,2 +1,4 @@
 transformer_lens
 matplotlib
+plotly
+dash
