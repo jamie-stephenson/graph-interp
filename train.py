@@ -16,44 +16,49 @@ def main(
     config_file: str | None = None
 ):
 
-    with wandb.init(
+    run = wandb.init(
         project='aisf',
         config=config_file,
         mode=wandb_mode
-    ) as run:
+    )
 
-        args = wandb.config
+    args = wandb.config
 
-        run.name = f"{args.model}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    run_name = f"{args.model}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
-        args.device = "cuda" if torch.cuda.is_available() else "cpu"
-        torch.manual_seed(args.seed)
+    if wandb_mode != "disabled":
+        run.name = run_name
 
-        model = get_model(args)
-        train_dataloader = get_dataloader(args.format,args.train_path,args.batch_size)
-        eval_dataloader = get_dataloader(args.format,args.val_path,args.batch_size)
+    args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.manual_seed(args.seed)
 
-        optimizer = AdamW(
-            params=model.parameters(),
-            betas=(args.beta1,args.beta2),
-            weight_decay=args.weight_decay, 
-            fused='cuda'==args.device
-        )
+    model = get_model(args)
+    train_dataloader = get_dataloader(args.format,args.train_path,args.batch_size)
+    eval_dataloader = get_dataloader(args.format,args.val_path,args.batch_size)
 
-        lr_scheduler = OneCycleLR(
-            optimizer, 
-            args.lr_max, 
-            pct_start=args.lr_pct_start,
-            epochs=args.epochs, 
-            steps_per_epoch=len(train_dataloader)
-        ) 
-        
-        model = train(model,train_dataloader,eval_dataloader,optimizer,lr_scheduler,args)
+    optimizer = AdamW(
+        params=model.parameters(),
+        betas=(args.beta1,args.beta2),
+        weight_decay=args.weight_decay, 
+        fused='cuda'==args.device
+    )
 
-        os.makedirs("trained_models",exist_ok=True)
-        torch.save(model.state_dict(),f"trained_models/{run.name}.pt")
-        with open(f"trained_models/{run.name}.yaml",'w') as file:
-            yaml.dump(dict(args.items()), file) # args: wandb_config.Config requires weird handling 
+    lr_scheduler = OneCycleLR(
+        optimizer, 
+        args.lr_max, 
+        pct_start=args.lr_pct_start,
+        epochs=args.epochs, 
+        steps_per_epoch=len(train_dataloader)
+    ) 
+    
+    model = train(model,train_dataloader,eval_dataloader,optimizer,lr_scheduler,args)
+
+    os.makedirs("trained_models",exist_ok=True)
+    torch.save(model.state_dict(),f"trained_models/{run_name}.pt")
+    with open(f"trained_models/{run_name}.yaml",'w') as file:
+        yaml.dump(dict(args.items()), file) # args: wandb_config.Config requires weird handling 
+
+    run.finish()
 
 def parse_clargs():
 
