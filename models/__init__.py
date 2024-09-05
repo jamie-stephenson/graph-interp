@@ -12,26 +12,27 @@ MODEL_MAP = {
     'mlp': MLP
 }
 
-def get_model(args: Config):
+def get_model(cfg: Config | ModelConfig):
 
-    model_class = MODEL_MAP[args.model]
+    model_class = MODEL_MAP[cfg.model]
 
-    # I can't get my wandb sweep to support nested config dict
-    # so all model params have to be a top level param which
-    # we filter as follows:
+    if isinstance(cfg, Config):
+        # I can't get my wandb sweep to support nested config dict
+        # so all model params have to be a top level param which
+        # we filter as follows:
 
-    # Dataclasses don't seem to inherit full signature? So we combine both signatures:
-    cfg_signature = {
-        **signature(ModelConfig).parameters,
-        **signature(HookedTransformerConfig).parameters
-    }
-
-    cfg = ModelConfig(
-        **{
-            key: value
-            for key, value in args.items()
-            if key in cfg_signature
+        # Dataclasses don't seem to inherit full signature? So we combine both signatures:
+        cfg_signature = {
+            **signature(ModelConfig).parameters,
+            **signature(HookedTransformerConfig).parameters
         }
-    )
+
+        cfg = ModelConfig(
+            **{
+                key: value
+                for key, value in cfg.items()
+                if key in cfg_signature
+            }
+        )
 
     return model_class(cfg)

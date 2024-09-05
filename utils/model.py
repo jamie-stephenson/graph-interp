@@ -25,11 +25,13 @@ class ModelConfig(HookedTransformerConfig):
     # clearer names
     n_vertices: int
 
+    model: str = "transformer"
+
     n_ctx: int = None
 
     # mlps do not require `d_head` and `act_fn` but __post_init__ does
     d_head: int = 1 
-    act_fn: str = 'gelu'
+    act_fn: str = "gelu"
 
     def __post_init__(self):
         self.n_ctx = self.n_vertices
