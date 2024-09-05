@@ -11,6 +11,7 @@ from torch import Tensor
 import einops
 from jaxtyping import Float, Int
 
+import math
 import logging
 from typing import Optional, Tuple, Dict, Union
 
@@ -53,6 +54,10 @@ class Transformer(HookedTransformer):
         if self.cfg.init_weights:
             self.init_weights()
 
+            # Special init for embeddings:
+            nn.init.kaiming_uniform_(self.embed.W_E,a=math.sqrt(5), mode="fan_out")
+            nn.init.normal_(self.pos_embed.W_pos)
+
         if move_to_device:
             self.move_model_modules_to_device()
 
@@ -82,12 +87,7 @@ class Transformer(HookedTransformer):
         if start_at_layer is None:
 
             embed = self.hook_embed(self.embed(input))
-            pos_embed = einops.repeat(
-                self.pos_embed(torch.arange(self.cfg.n_vertices,device=self.cfg.device)),
-                "n_vertices d_model -> batch n_vertices d_model",
-                batch = input.shape[0]
-            )
-            pos_embed = self.hook_pos_embed(pos_embed)
+            pos_embed = self.hook_pos_embed(self.pos_embed(input))
             residual = embed + pos_embed
 
         else:
@@ -138,7 +138,3 @@ class Transformer(HookedTransformer):
         label: Int[Tensor, "batch"],
     ):
         return F.cross_entropy(logits, label)
-
-
-
-

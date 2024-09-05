@@ -26,7 +26,7 @@ def main(
 
     run_name = f"{args.model}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
-    if wandb_mode != "disabled":
+    if wandb_mode != "disabled": # "disabled" will be removed from wandb TODO: find alternative
         run.name = run_name
 
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
