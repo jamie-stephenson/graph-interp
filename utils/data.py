@@ -7,7 +7,7 @@ class AdjDataset(Dataset):
     def __init__(self,file):
         dataset = np.load(file)
         self.data = torch.tensor(dataset['data'],dtype=torch.float32)
-        self.labels = torch.tensor(dataset['labels'],dtype=torch.uint8)
+        self.labels = torch.tensor(dataset['labels'],dtype=torch.int64)
 
     def __getitem__(self, index):
         return self.data[index],self.labels[index]
