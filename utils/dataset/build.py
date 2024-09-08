@@ -7,7 +7,7 @@ from torch import Tensor
 from jaxtyping import Float,Int
 
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Callable, Union
 
 def generate_dataset(
         n: int,
@@ -168,6 +168,83 @@ def get_stats(n,start,end,m_sample_size,plot: bool = False):
 
     return stats
 
+def _generate_graphs_with_property(
+    predicate: Callable[[nx.Graph,bool], bool],
+    n: int,
+    start: int,
+    end: int,
+    size: int,
+    return_labels: bool = False,
+    tqdm_desc: str = "generating graphs",
+    path: Path | None = None,
+    cutoff: int = 100_000
+) -> Union[
+        Float[Tensor,"size n n"],
+        Tuple[Float[Tensor,"size n n"],Int[Tensor,"size"]]
+    ]:
+
+    """
+    Generate a set of graphs with a certain property. 
+    Graphs will be sampled from G(n,m) until `size//(end-start)` graphs, `g` (with `is_planar=nx.is_planar(g)`), 
+    have been sampled such that `predicate(g,is_planar)==True`. This is repeated for each m in [start,end).
+    Each value of m will have an equal number of corresponding graphs sampled
+    (Therefore number of m values from `start` to `end` must divide both split sizes).
+    Returns adjacency matrices (and optionally labels) in torch tensor which will be saved as numpy array 
+    to a file at the given `path`. A `cutoff` is needed incase the [start,end) includes values for which 
+    the property is very unlikely. 
+    """
+
+    assert size%(end-start)==0,(
+        f"number of m values ({end-start}, from {start} to {end}) must " 
+        f"divide `size` ({size}), maybe try `size={(end-start)*(size//(end-start))}`."
+    )
+
+    data = np.empty((size,n,n),np.float32)
+
+    if return_labels:
+        labels = np.empty((size),dtype=np.int64)
+
+    m_size = size//(end-start) # Number of graphs needed for each m value
+
+    n_added = 0
+    for i,m in enumerate(tqdm(range(start,end),desc=tqdm_desc)):
+        n_iter = 0
+        while n_added < (i+1)*m_size and n_iter < cutoff:
+
+            g = nx.gnm_random_graph(n, m)
+            is_planar = nx.is_planar(g)
+
+            if predicate(g,is_planar):
+                data[n_added] = nx.to_numpy_array(g)
+
+                if return_labels:
+                    labels[n_added] = is_planar
+
+                n_added += 1
+
+            n_iter += 1
+
+        assert n_iter < cutoff, (
+            "Cutoff reached, please increase cutoff or adjust start and end so "
+            "that the probability of your predicate `{}` evaluating to `True` is larger."
+            .format(predicate.__name__)
+        )
+
+    if path:
+        if return_labels:
+            np.savez(path, data=data, labels=labels)
+        else:
+            np.save(path,data)
+
+    data_tensor = torch.tensor(data)
+    
+    if return_labels:
+        labels_tensor = torch.tensor(labels)
+        return data_tensor, labels_tensor 
+    else:
+        return data_tensor
+
+
 def generate_planar(
     n: int,
     start: int,
@@ -176,44 +253,54 @@ def generate_planar(
     path: Path | None = None,
     non_planar: bool = False,
     cutoff: int = 100_000
+) -> Float[Tensor,"size n n"]:
+    
+    def planarity_predicate(g,is_planar:bool):
+         """
+         Returns:
+         - `True` if `graph`'s planarity matches our desired planarity condition sepcified by `non_planar`
+         - `False` otherwise
+         """
+         return is_planar != non_planar
+    
+    return _generate_graphs_with_property(
+         predicate=planarity_predicate,
+         n=n,
+         start=start,
+         end=end,
+         size=size,
+         return_labels=False,
+         tqdm_desc="generating {}planar set".format("non-" if non_planar else ""),
+         path=path,
+         cutoff=cutoff
+    )
+    
+
+def generate_misclass(
+    model,
+    start: int,
+    end: int,
+    size: int,
+    path: Path | None = None,
+    cutoff: int = 100_000
 ) -> Tuple[Float[Tensor,"size n n"],Int[Tensor,"size"]]:
-    """
-    Generate a set of (non)planar graphs. 
-    Graphs will be sampled from G(n,m) until `size//(end-start)` (non)planar graphs have been sampled.
-    This is repeated for each m in [start,end).
-    Each value of m will have an equal number of corresponding graphs sampled
-    (Therefore number of m values from `start` to `end` must divide both split sizes).
-    Returns adjacency matrices in torch tensor which will be saved as numpy array to a file at the given `path`.
-    A `cutoff` is needed incase the [start,end) includes values for which (non)planarity is very unlikely 
-    """
-    assert size%(end-start)==0,(
-        f"number of m values ({end-start}, from {start} to {end}) must " 
-        f"divide `size` ({size}), maybe try `size={(end-start)*(size//(end-start))}`."
+    
+    def is_misclassified(g,is_planar):
+        x = torch.tensor(nx.adjacency_matrix(g).toarray(),dtype=torch.float32)
+        logits = model(x)
+        return logits.argmax()!=is_planar
+    
+    return _generate_graphs_with_property(
+         predicate=is_misclassified,
+         n=model.cfg.n_vertices,
+         start=start,
+         end=end,
+         size=size,
+         return_labels=True,
+         tqdm_desc="generating misclassified set",
+         path=path,
+         cutoff=cutoff
     )
 
-    data = np.empty((size,n,n))
-    m_size = size//(end-start) # Number of graphs needed for each m value
 
-    tqdm_desc = "generating {}planar set".format("non-" if non_planar else "")
 
-    n_added = 0
-    for i,m in enumerate(tqdm(range(start,end),desc=tqdm_desc)):
-        n_iter = 0
-        while n_added < (i+1)*m_size and n_iter < cutoff:
-            g = nx.gnm_random_graph(n, m)
-            g_wanted = nx.is_planar(g) != non_planar
-            if g_wanted:
-                data[n_added] = nx.to_numpy_array(g)
-                n_added += 1
-            n_iter += 1
-
-        assert n_iter < cutoff, (
-            "Cutoff reached, please adjust start and end so "
-            "that the probability of {}planarity is larger."
-            .format("non-" if non_planar else "")
-        )
-
-    if path:
-        np.save(path,data=data)
-
-    return torch.tensor(data,dtype=torch.float32)

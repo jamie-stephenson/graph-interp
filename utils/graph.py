@@ -11,7 +11,7 @@ from jaxtyping import Float
 import colorsys
 
 def graph_to_adj(g: Graph) -> Tensor:
-    return torch.tensor(nx.adjacency_matrix(g).toarray(),dtype=torch.float)
+    return torch.tensor(nx.adjacency_matrix(g).toarray(),dtype=torch.float32)
 
 def adj_to_graph(adj: Tensor) -> Graph:
     return nx.from_numpy_array(adj.numpy())
