@@ -1,12 +1,13 @@
 import networkx as nx
+from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
+import torch
+from torch import Tensor
+from jaxtyping import Float,Int
 
-from types import SimpleNamespace
 from pathlib import Path
-import argparse
-import yaml
+from typing import Tuple
 
 def generate_dataset(
         n: int,
@@ -26,7 +27,9 @@ def generate_dataset(
     Each value of m will have an equal number of corresponding graphs sampled
     (Therefore number of m values from `start` to `end` must divide both split sizes).
     Adjacency matrices and planarity labels will be saved to their respective split
-    files in the directory with the given `path`.
+    files in the directory with the given `path`. You can choose to "normalize" either
+    split by ensuring that, for each m value, exactly half the graphs that are added to 
+    the dataset are planar.
     """
     
     split_args = list(zip(
@@ -50,20 +53,20 @@ def generate_dataset(
         split_path = path/Path(f"{split}.npz")
 
         if normalized:
-            _generate_normalized_split(n,split,start,end,split_path,size,cutoff)
+            generate_normalized_split(n,split,start,end,split_path,size,cutoff)
         else:
-            _generate_natural_split(n,split,start,end,split_path,size)
+            generate_natural_split(n,split,start,end,split_path,size)
 
 
-def _generate_normalized_split(
-        n: int,
-        split: str,
-        start: int,
-        end: int,
-        path: Path,
-        size: int,   
-        cutoff: int
-    ):
+def generate_normalized_split(
+    n: int,
+    split: str,
+    start: int,
+    end: int,
+    path: Path,
+    size: int,   
+    cutoff: int
+):
         """
         Generate a single split of random graphs. 
         Graphs will be sampled from G(n,m) for each m in [start,end).
@@ -105,17 +108,18 @@ def _generate_normalized_split(
                 "Cutoff reached, please adjust start and end so "
                 "that the probability of planarity is less extreme."
             )
-            np.savez(path,data=data,labels=labels)
+        
+        np.savez(path,data=data,labels=labels)
 
 
-def _generate_natural_split(
-        n: int,
-        split: str,
-        start: int,
-        end: int,
-        path: Path,
-        size: int
-    ):
+def generate_natural_split(
+    n: int,
+    split: str,
+    start: int,
+    end: int,
+    path: Path,
+    size: int
+):
         """
         Generate a single split of random graphs. 
         Graphs will be sampled from G(n,m) for each m in [start,end).
@@ -164,39 +168,52 @@ def get_stats(n,start,end,m_sample_size,plot: bool = False):
 
     return stats
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser()
-
-    # args I want from the command line:
-    parser.add_argument(
-        "--config",
-        default="configs/dataset.yaml",
-        type=Path,
-        help="Path to config file."
+def generate_planar(
+    n: int,
+    start: int,
+    end: int,
+    size: int,
+    path: Path | None = None,
+    non_planar: bool = False,
+    cutoff: int = 100_000
+) -> Tuple[Float[Tensor,"size n n"],Int[Tensor,"size"]]:
+    """
+    Generate a set of (non)planar graphs. 
+    Graphs will be sampled from G(n,m) until `size//(end-start)` (non)planar graphs have been sampled.
+    This is repeated for each m in [start,end).
+    Each value of m will have an equal number of corresponding graphs sampled
+    (Therefore number of m values from `start` to `end` must divide both split sizes).
+    Returns adjacency matrices in torch tensor which will be saved as numpy array to a file at the given `path`.
+    A `cutoff` is needed incase the [start,end) includes values for which (non)planarity is very unlikely 
+    """
+    assert size%(end-start)==0,(
+        f"number of m values ({end-start}, from {start} to {end}) must " 
+        f"divide `size` ({size}), maybe try `size={(end-start)*(size//(end-start))}`."
     )
-    
-    clargs = parser.parse_args()
 
-    # args I want to set from a file:
-    with open(clargs.config, 'r') as yaml_file:
-        yaml_config = yaml.safe_load(yaml_file)
-    
-    args = SimpleNamespace(**yaml_config)
+    data = np.empty((size,n,n))
+    m_size = size//(end-start) # Number of graphs needed for each m value
 
-    # Make informative directory name for dataset: 
-    normalized_train_string = "_tn" if args.normalized_train else ""
-    normalized_val_string ="_vn" if args.normalized_val else ""
-    path = Path(f"data/n{args.n}_{args.start}-{args.end}{normalized_train_string}{normalized_val_string}")
+    tqdm_desc = "generating {}planar set".format("non-" if non_planar else "")
 
-    generate_dataset(
-        n=args.n,
-        start=args.start,
-        end=args.end,
-        path=path,
-        train_size=args.train_size,
-        val_size=args.val_size,
-        normalized_train=args.normalized_train,
-        normalized_val=args.normalized_val,
-        cutoff=args.cutoff
-    )
+    n_added = 0
+    for i,m in enumerate(tqdm(range(start,end),desc=tqdm_desc)):
+        n_iter = 0
+        while n_added < (i+1)*m_size and n_iter < cutoff:
+            g = nx.gnm_random_graph(n, m)
+            g_wanted = nx.is_planar(g) != non_planar
+            if g_wanted:
+                data[n_added] = nx.to_numpy_array(g)
+                n_added += 1
+            n_iter += 1
+
+        assert n_iter < cutoff, (
+            "Cutoff reached, please adjust start and end so "
+            "that the probability of {}planarity is larger."
+            .format("non-" if non_planar else "")
+        )
+
+    if path:
+        np.save(path,data=data)
+
+    return torch.tensor(data,dtype=torch.float32)
