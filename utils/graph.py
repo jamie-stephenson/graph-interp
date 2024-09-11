@@ -48,6 +48,9 @@ def get_colorscale(n):
 
 def plot_attention(g: Graph, attention: Float[Tensor, "n_heads n_vertices n_vertices"]):
 
+    if len(attention.shape)==4 and attention.shape[0]==1:
+        attention = attention.squeeze(0)
+    
     n = len(g.nodes())
     n_heads = len(attention)
 
