@@ -9,11 +9,6 @@ from jaxtyping import Float
 from dataclasses import dataclass
 from typing import Union, Dict
 
-# for laplacian??
-def deactivate_position(model):
-    model.pos_embed.W_pos.data[:] = 0.0
-    model.pos_embed.W_pos.requires_grad = False
-
 @dataclass(kw_only=True)
 class ModelConfig(HookedTransformerConfig):
     """
@@ -84,4 +79,9 @@ class GraphEmbed(nn.Module):
     def forward(
         self, input: Float[Tensor, "batch n_vertices n_vertices"]
     ) -> Float[torch.Tensor, "batch n_vertices d_model"]:
-        return input @ self.W_E # (B V V)(V C)->(B V C)
+        return input @ self.W_E
+    
+# for laplacian??
+def deactivate_position(model):
+    model.pos_embed.W_pos.data[:] = 0.0
+    model.pos_embed.W_pos.requires_grad = False 

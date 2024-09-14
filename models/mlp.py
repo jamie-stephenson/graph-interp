@@ -13,7 +13,7 @@ import logging
 
 class MLP(HookedRootModule):
     def __init__(self,cfg: ModelConfig):
-        super().__init__()#TODO initialise layer weights correctly
+        super().__init__()
         self.cfg = cfg
 
         layer_in = HookedLinear(cfg.n_vertices**2,cfg.d_model,torch.float32)
