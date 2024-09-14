@@ -1,8 +1,10 @@
 """Helper functions for interpreting component composition"""
 
+import plotly.subplots
 from models import Transformer
 
 from transformer_lens import ActivationCache
+import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
@@ -11,26 +13,34 @@ import einops
 from jaxtyping import Float
 import numpy as np
 
-from typing import Optional
+from typing import Optional, List
 
-def decompose_qk_input(model: Transformer, cache: ActivationCache) -> Float[Tensor, "batch n_components n_vertices d_model"]:
+def decompose_qk_input(model: Transformer, cache: ActivationCache, layer: int = 1) -> Float[Tensor, "batch n_components n_vertices d_model"]:
+
+    assert layer in [0,1], f"Only supported layers are 0 and 1, not {layer}."
 
     y_embed = cache["embed"].unsqueeze(dim=1) # (batch 1 n_vertices d_model)
     y_pos = cache["pos_embed"].unsqueeze(dim=1) # (batch 1 n_vertices d_model)
-    y_heads = cache["result", 0].transpose(1, 2) # (batch n_heads n_vertices d_model)
-    y_stack = torch.cat([y_embed, y_pos, y_heads], dim=1)
 
-    mlp = model.blocks[0].mlp
+    if layer == 1:
+        y_heads = cache["result", 0].transpose(1, 2) # (batch n_heads n_vertices d_model)
+        y_stack = torch.cat([y_embed, y_pos, y_heads], dim=1)
 
-    return mlp(y_stack) + y_stack
+        mlp = model.blocks[0].mlp
+        decomposed_qk_input = mlp(y_stack) + y_stack
+    else:
+        decomposed_qk_input = torch.cat([y_embed, y_pos], dim=1)
+
+    return decomposed_qk_input
 
 def decompose_q(
+    model: Transformer,
     decomposed_qk_input: Float[Tensor, "batch n_components n_vertices d_head"],
     head_index: int,
-    model: Transformer,
+    layer: int = 1
 ) -> Float[Tensor, "batch n_components n_vertices d_head"]:
 
-    W_Q = model.W_Q[1, head_index]
+    W_Q = model.W_Q[layer, head_index]
 
     return einops.einsum(
         decomposed_qk_input, W_Q,
@@ -38,12 +48,13 @@ def decompose_q(
     )
 
 def decompose_k(
+    model: Transformer,
     decomposed_qk_input: Float[Tensor, "batch n_components n_vertices d_head"],
     head_index: int,
-    model: Transformer,
+    layer: int = 1
 ) -> Float[Tensor, "batch n_components n_vertices d_head"]:
 
-    W_K = model.W_K[1, head_index]
+    W_K = model.W_K[layer, head_index]
 
     return einops.einsum(
         decomposed_qk_input, W_K,
@@ -59,6 +70,76 @@ def decompose_attn_scores(
         decomposed_q, decomposed_k,
         "batch q_comp q_pos d_model, batch k_comp k_pos d_model -> batch q_comp k_comp q_pos k_pos",
     )
+
+def plot_decomposed_attn_scores(
+    decomposed_scores: Float[Tensor, "batch query_component key_component query_pos key_pos"],
+    cache: ActivationCache,
+    component_labels: List[str],
+    head_idx: int,
+    layer: int = 1,
+    batch_sample_idx: int = 0,
+    zmax: float = 80.,
+):
+    """
+    Given batch, will take one sample graph and plot the attention scores for the given head.
+    Then plots the given decomposed scores for that head and sample graph.
+    Then plots the standard deviation of the decomposed scores, averaged out across the whole batch.
+    """
+    
+    assert len(cache['attn_scores',layer].shape) == 4,(
+        "Cached pattern has incorrect shape, perhaps you forgot to include a batch dimension?"
+    )
+
+    n_components = len(component_labels)
+
+    decomposed_stds = einops.reduce(
+        decomposed_scores,
+        "batch query_decomp key_decomp query_pos key_pos -> batch query_decomp key_decomp",
+        torch.std
+    )
+
+    px.imshow(
+        cache['attn_scores',layer][batch_sample_idx,head_idx].detach(),
+        color_continuous_scale='Blues',
+        title="Original Sample Attention Scores"
+    ).show()
+
+    fig = plotly.subplots.make_subplots(
+        rows=n_components, 
+        row_titles=component_labels,
+        y_title='Query Components',
+        cols=n_components,
+        column_titles=component_labels,
+        x_title='Key Components'
+    )
+
+    for i in range(n_components):
+        for j in range(n_components):
+
+            heatmap = go.Heatmap(
+                z=decomposed_scores[batch_sample_idx, i, j].detach(),
+                colorscale='RdBu',
+                zmax=zmax,
+                zmin=-zmax
+            )
+            fig.add_trace(heatmap, row=i+1, col=j+1)
+            fig.update_yaxes(autorange='reversed')
+
+    fig.update_layout(height=155*n_components+300, width=155*n_components+300)
+
+    fig.show()
+
+    # std dev over query and key positions, shown by component. Mean over whole batch
+    px.imshow(
+        decomposed_stds.mean(0).detach(),
+        labels={"x": "Key Component", "y": "Query Component"},
+        title="Standard deviations of attention score contributions (by key and query component)",
+        x=component_labels,
+        y=component_labels,
+        color_continuous_scale='Blues',
+        width=800
+    ).show()
+
 
 def get_comp_score(
     W_A: Float[Tensor, "in_A out_A"],
