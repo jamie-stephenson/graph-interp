@@ -100,7 +100,8 @@ def plot_decomposed_attn_scores(
 
     px.imshow(
         cache['attn_scores',layer][batch_sample_idx,head_idx].detach(),
-        color_continuous_scale='Blues',
+        color_continuous_scale='RdBu',
+        color_continuous_midpoint=0,
         title="Original Sample Attention Scores"
     ).show()
 

@@ -10,6 +10,7 @@ import colorsys
 
 def plot_attention(graph: nx.Graph, attention: Float[Tensor, "n_heads n_vertices n_vertices"]):
 
+    # TODO: cannot run twice in a notebook with different attention patterns with out interference, fix this.
     if len(attention.shape)==4 and attention.shape[0]==1:
         attention = attention.squeeze(0)
     
@@ -93,7 +94,7 @@ def plot_attention(graph: nx.Graph, attention: Float[Tensor, "n_heads n_vertices
                                 margin=dict(b=0, l=0, r=0, t=40),
                                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))),
-            style={'width': '40%', 'height': '500px'}
+            style={'width': '1030px', 'height': '500px'}
         ),
     ])
 
