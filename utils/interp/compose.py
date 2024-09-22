@@ -27,7 +27,7 @@ def decompose_qk_input(model: Transformer, cache: ActivationCache, layer: int = 
         y_stack = torch.cat([y_embed, y_pos, y_heads], dim=1)
 
         mlp = model.blocks[0].mlp
-        decomposed_qk_input = mlp(y_stack) + y_stack
+        decomposed_qk_input = mlp(y_stack) + y_stack # Not very principled!
     else:
         decomposed_qk_input = torch.cat([y_embed, y_pos], dim=1)
 

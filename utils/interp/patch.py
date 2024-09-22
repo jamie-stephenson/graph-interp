@@ -7,10 +7,13 @@ from transformer_lens.hook_points import HookPoint
 import plotly.express as px
 import torch
 from torch import Tensor
+import einops
 from jaxtyping import Float
+from tqdm import tqdm
 
 from typing import Optional, Callable, Union, Sequence, List
 from functools import partial
+import itertools
 
 def patch_head_acts(
     corrupted_head_outputs: Float[Tensor, "batch n_vertices n_heads d_head"],
@@ -22,7 +25,7 @@ def patch_head_acts(
     Patches the activations (sepcified by `hook`) of a given head at
     every vertex position, using the value from the clean cache.
     '''
-    corrupted_head_outputs[:, :, head_ids] = clean_cache[hook.name][:,:, head_ids]
+    corrupted_head_outputs[:, :, head_ids] = clean_cache[hook.name][:, :, head_ids]
     
     return corrupted_head_outputs
 
@@ -39,87 +42,137 @@ def run_with_patched_heads(
     )
 
 
-def run_with_patched_head_path(
+def get_path_patched_attn_pattern(
     model: Transformer,
-    corrupted_input: Float[Tensor,"batch n_vertices n_vertices"],
+    corrupted_input: Float[Tensor,"1 n_vertices n_vertices"],
     corrupted_cache: ActivationCache,
+    clean_input: Float[Tensor,"batch n_vertices n_vertices"],
     clean_cache: ActivationCache,
-    layer_0_heads: List[int],
-    layer_1_head: int,
-    comp_types: str
+    q_heads_to_patch: List[int],
+    q_patch_embed: bool,
+    k_heads_to_patch: List[int],
+    k_patch_embed: bool,
+    layer_1_head: int
  ) -> Float[Tensor, "layer head"]:
     """"
-    Patch the path from a collection of heads in layer 0 to a single input ('Q', 'K' or 'V')
-    or multiple inputs ('QK', 'QV' etc.) of a single head in layer 1.
+    "Simultaneously" patch paths from two sets of components to the query and key of a layer 1 head.
+    Return the resulting attention pattern from that head.
     """
-    allowed_types = set('qkv')
-    comp_types = set(comp_types.lower())
-    assert comp_types.issubset(allowed_types), "Invalid comp type, must be 'Q', 'K' or 'V' or a combination of them."
-    assert comp_types!=allowed_types, "Path patching to all head inputs is the same as activation patching, please do that instead."
 
-    # for each input type, we need to know which heads to freeze, start by assuming we are freezing them all...
-    heads_to_freeze = {input_type: list(range(model.cfg.n_heads)) for input_type in allowed_types}
+    corrupted_input = einops.repeat(
+        corrupted_input,
+        "1 n_vertices_a n_vertices_b -> batch_size n_vertices_a n_vertices_b",
+        batch_size = clean_input.shape[0]
+    )
 
-    # and then remove the given head from input types any that we don't want to freeze  
-    for comp_type in comp_types:
-        heads_to_freeze[comp_type].pop(layer_1_head)
+    q_layer_0_heads_to_freeze = [i for i in range(model.cfg.n_heads) if i not in q_heads_to_patch]
+    k_layer_0_heads_to_freeze = [i for i in range(model.cfg.n_heads) if i not in k_heads_to_patch]
+    
+    if q_patch_embed:
+        # If we are patching the embed and freezing some heads in layer 0 this is the same as using clean input and patching the same heads in layer 0 
+        q_input = clean_input
+        q_layer_0_hook_fn = partial(patch_head_acts, head_ids=q_layer_0_heads_to_freeze, clean_cache=corrupted_cache)
+    else:
+        q_input = corrupted_input
+        q_layer_0_hook_fn = partial(patch_head_acts, head_ids=q_heads_to_patch, clean_cache=clean_cache)
 
-    patch_layer_0_heads_hook_fn = partial(patch_head_acts, head_ids=layer_0_heads, clean_cache=clean_cache)   # patch activations
-    freeze_layer_1_q_hook_fn = partial(patch_head_acts, head_ids=heads_to_freeze['q'], clean_cache=corrupted_cache) # freeze activations
-    freeze_layer_1_k_hook_fn = partial(patch_head_acts, head_ids=heads_to_freeze['k'], clean_cache=corrupted_cache) # freeze activations
-    freeze_layer_1_v_hook_fn = partial(patch_head_acts, head_ids=heads_to_freeze['v'], clean_cache=corrupted_cache) # freeze activations
+    if k_patch_embed:
+        # If we are patching the embed and freezing some heads in layer 0 this is the same as using clean input and patching the same heads in layer 0 
+        k_input = clean_input
+        k_layer_0_hook_fn = partial(patch_head_acts, head_ids=k_layer_0_heads_to_freeze, clean_cache=corrupted_cache)
+    else:
+        k_input = corrupted_input
+        k_layer_0_hook_fn = partial(patch_head_acts, head_ids=k_heads_to_patch, clean_cache=clean_cache)
+
+    model.reset_hooks()
+
+    q_cache = model.add_caching_hooks('blocks.1.attn.hook_q')
 
     model.run_with_hooks(
-        corrupted_input,
+        q_input,
+        fwd_hooks=[('blocks.0.attn.hook_z',q_layer_0_hook_fn)]
+    )
+
+    model.reset_hooks()
+
+    q_patch_hook_fn = partial(patch_head_acts, head_ids=layer_1_head, clean_cache=q_cache)
+    pattern_cache = model.add_caching_hooks('blocks.1.attn.hook_pattern')
+
+    model.run_with_hooks(
+        k_input,
         fwd_hooks=[
-            ('blocks.0.attn.hook_z',patch_layer_0_heads_hook_fn),
-            ('blocks.1.attn.hook_q',freeze_layer_1_q_hook_fn),
-            ('blocks.1.attn.hook_k',freeze_layer_1_k_hook_fn),
-            ('blocks.1.attn.hook_v',freeze_layer_1_v_hook_fn)
+            ('blocks.0.attn.hook_z',k_layer_0_hook_fn),
+            ('blocks.1.attn.hook_q',q_patch_hook_fn)
         ]
     )
 
+    return pattern_cache['blocks.1.attn.hook_pattern'][:,layer_1_head].squeeze(0).detach()
 
-def rank_heads_by_patching_metric(
+
+def get_path_patching_metric_results(
     model: Transformer,
     corrupted_input: Float[Tensor, "batch n_vertices n_vertices"],
+    corrupted_cache: ActivationCache,
+    clean_input: Float[Tensor, "batch n_vertices n_vertices"],
     clean_cache: ActivationCache,
     patching_metric: Callable,
-    patching_names: Optional[Union[Callable[[str], bool], Sequence[str], str]] 
-) -> Float[Tensor, "batch n_vertices n_vertices"]:
+    layer_1_head: int,
+    disable_k_heads: bool = True
+) -> dict:
     '''
-    Patches an increasing set of heads, each time adding the head that has the best effect
-    on the `patching_metric`. Displays heads in the order they were added along with the
-    metric score the achieved along with all previously added heads.
+    Calculates the `patching_metric` when the paths from every combination of components to
+    `layer_1_head`s query and key inputs are patched using the `clean_cache`.
 
-    The `patching_metric` function should be called on the model's patched and clean caches. 
-    The patched cache is created by caching activations specified by `patching_names`.
+    Returns a dict where keys are a tuples containing the tuples of components patched into the query and key,
+    and values are the patching metric when those specific paths are patched.
+
+    By default we avoid patching the paths from layer 0 heads to layer 1 keys, you can specify `disable_k_heads = False` 
+    to stop this.
+
+    If `clean_input` and `clean_cache` are for a batch of input graphs, then all metric results will be average across the batch.
     '''
-    model.reset_hooks()
-
-    patched_cache = model.add_caching_hooks(patching_names)
-
-    importance_ranking = []
-    metric_list = []
 
     heads = list(range(model.cfg.n_heads))
+    head_combinations = []
 
-    while heads:
+    for r in range(0, len(heads) + 1):
+        head_combinations.extend(itertools.combinations(heads, r))
 
-        min_metric = 100
-        min_head = -1
+    component_combinations = [
+        (patch_embed,*head_ids) 
+        for patch_embed in (True, False)
+        for head_ids in head_combinations
+    ]    
 
-        for head in heads:
-            ids = importance_ranking + [head]
-            
-            run_with_patched_heads(model,corrupted_input,clean_cache,ids)
+    k_combinations = [(True,),(False,)] if disable_k_heads else component_combinations
 
-            metric = patching_metric(patched_cache,clean_cache)
-            if metric < min_metric:
-                min_metric = metric
-                min_head = head
+    results = {
+        (q_components,k_components) : None
+        for q_components in component_combinations
+        for k_components in k_combinations
+    }
 
-        metric_list.append(min_metric)
-        importance_ranking.append(heads.pop(heads.index(min_head)))
-    
-    px.line(x=[str(i) for i in importance_ranking], y=metric_list, labels={'x': 'Head', 'y': 'Pattern Reconstruction Metric'}).show()
+    for q_components in tqdm(component_combinations):
+        for k_components in k_combinations:
+            pattern = get_path_patched_attn_pattern(
+                model,
+                corrupted_input,
+                corrupted_cache,
+                clean_input,
+                clean_cache,
+                q_heads_to_patch = q_components[1:],
+                q_patch_embed = q_components[0],
+                k_heads_to_patch = k_components[1:],
+                k_patch_embed = k_components[0],
+                layer_1_head = layer_1_head
+            ) 
+
+            results_key = (q_components,k_components) 
+
+            results[results_key] = patching_metric(
+                pattern,
+                clean_cache['blocks.1.attn.hook_pattern'][:,layer_1_head],
+                corrupted_cache['blocks.1.attn.hook_pattern'][:,layer_1_head]
+            )
+
+    return results
