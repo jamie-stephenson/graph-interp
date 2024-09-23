@@ -66,10 +66,12 @@ def decompose_attn_scores(
     decomposed_k: Float[Tensor, "batch n_components n_vertices d_head"]
 ) -> Float[Tensor, "batch query_component key_component query_pos key_pos"]:
     
+    d_head = decomposed_q.shape[-1]
+
     return einops.einsum(
         decomposed_q, decomposed_k,
         "batch q_comp q_pos d_model, batch k_comp k_pos d_model -> batch q_comp k_comp q_pos k_pos",
-    )
+    )/d_head**0.5
 
 def plot_decomposed_attn_scores(
     decomposed_scores: Float[Tensor, "batch query_component key_component query_pos key_pos"],
@@ -102,7 +104,8 @@ def plot_decomposed_attn_scores(
         cache['attn_scores',layer][batch_sample_idx,head_idx].detach(),
         color_continuous_scale='RdBu',
         color_continuous_midpoint=0,
-        title="Original Sample Attention Scores"
+        title="Original Sample Attention Scores",
+        width=610
     ).show()
 
     fig = plotly.subplots.make_subplots(
