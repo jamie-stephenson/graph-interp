@@ -101,7 +101,7 @@ def plot_decomposed_attn_scores(
     )
 
     px.imshow(
-        cache['attn_scores',layer][batch_sample_idx,head_idx].detach(),
+        cache['attn_scores',layer][batch_sample_idx,head_idx].detach().cpu(),
         color_continuous_scale='RdBu',
         color_continuous_midpoint=0,
         title="Original Sample Attention Scores",
@@ -121,7 +121,7 @@ def plot_decomposed_attn_scores(
         for j in range(n_components):
 
             heatmap = go.Heatmap(
-                z=decomposed_scores[batch_sample_idx, i, j].detach(),
+                z=decomposed_scores[batch_sample_idx, i, j].detach().cpu(),
                 colorscale='RdBu',
                 zmax=zmax,
                 zmin=-zmax
@@ -135,7 +135,7 @@ def plot_decomposed_attn_scores(
 
     # std dev over query and key positions, shown by component. Mean over whole batch
     px.imshow(
-        decomposed_stds.mean(0).detach(),
+        decomposed_stds.mean(0).detach().cpu(),
         labels={"x": "Key Component", "y": "Query Component"},
         title="Standard deviations of attention score contributions (by key and query component)",
         x=component_labels,
@@ -165,7 +165,7 @@ def plot_comp_scores(
 ) -> go.Figure:
     
     px.imshow(
-        comp_scores,
+        comp_scores.cpu(),
         y=component_labels,
         x=[f"1.{h}" for h in range(model.cfg.n_heads)],
         labels={"x": "Layer 1", "y": "Layer 0"},
