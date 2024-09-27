@@ -21,8 +21,6 @@ batch_per_log:
  value: 50
 seed:
  value: 90
-format:
- value: adj
 
 # Model Args:
 model:

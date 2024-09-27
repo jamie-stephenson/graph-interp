@@ -141,7 +141,7 @@ def plot_decomposed_attn_scores(
         x=component_labels,
         y=component_labels,
         color_continuous_scale='Blues',
-        width=800
+        width=610
     ).show()
 
 

@@ -33,8 +33,8 @@ def main(
     torch.manual_seed(args.seed)
 
     model = get_model(args)
-    train_dataloader = get_dataloader(args.format,args.train_path,args.batch_size)
-    eval_dataloader = get_dataloader(args.format,args.val_path,args.batch_size)
+    train_dataloader = get_dataloader(args.train_path,args.batch_size)
+    eval_dataloader = get_dataloader(args.val_path,args.batch_size)
 
     optimizer = AdamW(
         params=model.parameters(),

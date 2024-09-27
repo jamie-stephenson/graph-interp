@@ -70,12 +70,13 @@ def plot_attention(graph: nx.Graph, attention: Float[Tensor, "n_heads n_vertices
                                 showscale=False
                             ), 
                             layout=go.Layout(
-                                margin=dict(l=10, r=10, t=10, b=10),
+                                margin=dict(l=10, r=10, t=30, b=10),
                                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, autorange='reversed')
+                                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, autorange='reversed'),
+                            title=f"Head {i}"
                             )
                         ),
-                        style={'width': '120px', 'height': '120px'}
+                        style={'width': '120px', 'height': '140px'}
                     ),
                     id=f'attn-{i}',
                 ) 

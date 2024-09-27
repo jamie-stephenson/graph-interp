@@ -1,6 +1,6 @@
 .ipynb_checkpoints
 __pycache__
-data
+train.npz
 wandb
 .vscode
-trained_models
+unused.ipynb

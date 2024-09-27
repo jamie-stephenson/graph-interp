@@ -15,32 +15,8 @@ class AdjDataset(Dataset):
     def __len__(self):
         return len(self.labels)
 
-class LapDataset(Dataset):
-    """Dataset containing graphs represented by laplacian matrix"""
-    def __init__(self):
-        raise NotImplementedError
+def get_dataloader(file,batch_size:int):
 
-    @staticmethod
-    def generate_data():
-        pass
-
-class PromptDataset(Dataset):
-    """Dataset containing planarity verification prompts for each graph"""
-    def __init__(self):
-        raise NotImplementedError
-
-    @staticmethod
-    def generate_data():
-        pass
-
-def get_dataloader(format:str,file,batch_size:int):
-    if format == "adj":
-        dataset = AdjDataset(file)
-    elif format == "lap":
-        raise NotImplementedError
-    elif format == "gpt2":
-        raise NotImplementedError
-    else:
-        raise ValueError(f"Invalid dataset format: {format}")
+    dataset = AdjDataset(file)
     
     return DataLoader(dataset,batch_size,shuffle=True)

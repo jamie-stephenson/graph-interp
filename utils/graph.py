@@ -11,10 +11,13 @@ class Graph:
     def __init__(self, graph: nx.Graph | Float[Tensor,"n_vertices n_vertices"]):
         if isinstance(graph,nx.Graph):
             self.G = graph
-            self.A = torch.tensor(nx.adjacency_matrix(graph).toarray(),dtype=torch.float32).unsqueeze(0) # batch dimension for convenience
+            self.X = torch.tensor(nx.adjacency_matrix(graph).toarray(),dtype=torch.float32).unsqueeze(0) # batch dimension for convenience
+        elif isinstance(graph,Tensor):
+            graph.squeeze_(0)
+            self.G = nx.from_numpy_array(graph.numpy(force=True))
+            self.X = graph.unsqueeze(0) # squeeze+unsqueeze guarantees correct shape for `.numpy()`:(a,b), and `self.X`:(1,a,b).
         else:
-            self.G = nx.from_numpy_array(graph.squeeze(0).numpy(force=True))
-            self.A = graph
+            raise TypeError(f"Unsupported type: {type(graph)}")
 
     def plot(
         self, 

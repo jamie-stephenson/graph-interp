@@ -12,11 +12,9 @@ MODEL_MAP = {
     'mlp': MLP
 }
 
-def get_model(cfg: Config | ModelConfig):
+def get_model(cfg: Config | dict | ModelConfig):
 
-    model_class = MODEL_MAP[cfg.model]
-
-    if isinstance(cfg, Config):
+    if isinstance(cfg, (Config,dict)):
         # I can't get my wandb sweep to support nested config dict
         # so all model params have to be a top level param which
         # we filter as follows:
@@ -34,5 +32,12 @@ def get_model(cfg: Config | ModelConfig):
                 if key in cfg_signature
             }
         )
+
+    if isinstance(cfg, (Config,ModelConfig)):
+        model_class = MODEL_MAP[cfg.model]
+    elif isinstance(cfg, dict):
+        model_class = MODEL_MAP[cfg['model']]
+    else:
+        raise TypeError(f"Unsupported config type: {type(cfg)}.")
 
     return model_class(cfg)
